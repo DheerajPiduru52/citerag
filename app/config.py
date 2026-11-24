@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 120
     top_k: int = 5
+    vector_k: int = 20
+    bm25_k: int = 20
+    rrf_k: int = 60
 
     index_path: str = "index"
 
