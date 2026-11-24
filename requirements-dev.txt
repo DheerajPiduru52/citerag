@@ -1,0 +1,4 @@
+-r requirements.txt
+fpdf2
+pytest
+httpx
