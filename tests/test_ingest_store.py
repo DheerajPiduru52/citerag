@@ -1,4 +1,4 @@
-"""Phase 1 tests: chunking, hashing/dedupe, store round-trip and persistence."""
+"""Store tests: dedupe, round-trip, persistence, rollback (chunking: test_chunking.py)."""
 import hashlib
 import sys
 from pathlib import Path
@@ -9,8 +9,6 @@ from langchain_core.embeddings import Embeddings
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.config import Settings  # noqa: E402
-from app.ingest import chunk_pages, doc_id_from_hash, load_pdf, sha256_file  # noqa: E402
 from app.store import DocumentStore  # noqa: E402
 
 SAMPLE = Path(__file__).resolve().parent.parent / "data" / "sample.pdf"
@@ -38,32 +36,6 @@ class FakeEmbeddings(Embeddings):
 @pytest.fixture
 def store(tmp_path: Path) -> DocumentStore:
     return DocumentStore(FakeEmbeddings(), tmp_path / "idx")
-
-
-def test_chunking_sizes_and_metadata() -> None:
-    settings = Settings(chunk_size=200, chunk_overlap=20)
-    pages = [(1, "word " * 200), (3, "other " * 100)]
-    chunks = chunk_pages(pages, "abc", "f.pdf", settings)
-    assert len(chunks) > 2
-    assert all(len(c.page_content) <= 200 for c in chunks)
-    ids = [c.metadata["chunk_id"] for c in chunks]
-    assert len(set(ids)) == len(ids)
-    assert ids[0] == "abc:1:0"
-    for c in chunks:
-        assert set(c.metadata) == {"doc_id", "filename", "page", "chunk_id"}
-        assert c.metadata["doc_id"] == "abc" and c.metadata["filename"] == "f.pdf"
-    assert {c.metadata["page"] for c in chunks} == {1, 3}
-
-
-def test_sample_pdf_pages_and_hash() -> None:
-    doc_id, digest, chunks, pages = load_pdf(SAMPLE)
-    assert pages == 22
-    assert len(chunks) >= 40
-    assert digest == sha256_file(SAMPLE) == hashlib.sha256(SAMPLE.read_bytes()).hexdigest()
-    assert doc_id == doc_id_from_hash(digest)
-    assert {c.metadata["page"] for c in chunks} == set(range(1, pages + 1))
-    assert any("E-4012" in c.page_content for c in chunks)
-    assert {c.metadata["page"] for c in chunks if "E-4012" in c.page_content} == {3}
 
 
 def test_add_dedupe_list_delete(store: DocumentStore) -> None:

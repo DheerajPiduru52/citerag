@@ -1,0 +1,22 @@
+{
+  "filename": "sample.pdf",
+  "questions": [
+    {"id": "Q01", "type": "exact", "question": "What does error E-4012 mean?", "pages": [3]},
+    {"id": "Q02", "type": "exact", "question": "Which part number is the analog pressure transmitter?", "pages": [2, 5]},
+    {"id": "Q03", "type": "exact", "question": "What do I need to send a unit back for repair? RMA", "pages": [7]},
+    {"id": "Q04", "type": "exact", "question": "What is the part number of the cabinet air filter AF-310?", "pages": [6]},
+    {"id": "Q05", "type": "exact", "question": "What does code W-0001 mean?", "pages": [4]},
+    {"id": "Q06", "type": "paraphrase", "question": "why does the pump keep switching off by itself when the tank is nearly empty", "pages": [8, 3]},
+    {"id": "Q07", "type": "paraphrase", "question": "What is the cause of a crackling noise like gravel inside the housing?", "pages": [9]},
+    {"id": "Q08", "type": "paraphrase", "question": "What is the risk of leaving a station under manual control and forgetting about it?", "pages": [10]},
+    {"id": "Q09", "type": "paraphrase", "question": "How does the controller protect the motor when the load gets too heavy?", "pages": [22, 3]},
+    {"id": "Q10", "type": "mixed", "question": "How often should the pressure input be calibrated and what deviation is allowed?", "pages": [5]},
+    {"id": "Q11", "type": "mixed", "question": "How long is the lead time for a spare PN-9902-C card?", "pages": [6]},
+    {"id": "Q12", "type": "mixed", "question": "The display reports that the stored history is corrupted; what should I do?", "pages": [3]},
+    {"id": "Q13", "type": "hard", "question": "Which menu code gives access to flashing new software onto the controller?", "pages": [4]},
+    {"id": "Q14", "type": "hard", "question": "What address does the SCADA link use by default?", "pages": [3]},
+    {"id": "Q15", "type": "hard", "question": "How much clock drift per month means the backup battery should be swapped?", "pages": [6]},
+    {"id": "Q16", "type": "hard", "question": "Is it wise to raise the protective limit to stop nuisance stoppages?", "pages": [22]},
+    {"id": "Q17", "type": "hard", "question": "If a fault vanishes after switching it off and on again, is the problem solved?", "pages": [21]}
+  ]
+}
