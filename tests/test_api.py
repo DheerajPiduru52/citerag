@@ -448,3 +448,21 @@ def test_openapi_metadata(client: TestClient) -> None:
     assert spec["info"]["description"] == "Hybrid-Search Document Q&A with Verified Citations"
     assert {"429", "502"} <= set(spec["paths"]["/query"]["post"]["responses"])
     assert {"400", "413", "415", "422"} <= set(spec["paths"]["/documents"]["post"]["responses"])
+
+
+@pytest.mark.parametrize("reply", ["", "  \n "])
+def test_empty_llm_reply_is_502_json(
+    client: TestClient, pdf_a: Path, llm: FakeLLM, reply: str
+) -> None:
+    upload(client, pdf_a)
+    llm.reply = reply
+    r = client.post("/query", json={"question": "error E-4012"})
+    assert r.status_code == 502
+    assert r.json() == {"detail": "LLM returned an empty reply", "code": "llm_error"}
+
+
+def test_openapi_documents_real_status_codes(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    assert "503" not in paths["/query"]["post"]["responses"]
+    assert "500" in paths["/documents"]["post"]["responses"]
+

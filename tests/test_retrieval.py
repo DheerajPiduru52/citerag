@@ -209,3 +209,13 @@ def test_real_models_on_sample_pdf(tmp_path: Path) -> None:
     assert 8 in pages(
         "why does the pump keep switching off by itself when the tank is nearly empty"
     )
+
+
+def test_vector_hits_without_metadata_are_skipped(retriever: HybridRetriever) -> None:
+    full = retriever.vector_search("error E-4012", 10)
+    assert full
+    dropped = full[0][0]
+    del retriever.store.chunks[dropped]  # vector remains, metadata gone
+    assert dropped not in [c for c, _ in retriever.vector_search("error E-4012", 10)]
+    assert dropped not in [c.chunk_id for c in retriever.retrieve_vector("error E-4012", 10)]
+    assert dropped not in [c.chunk_id for c in retriever.retrieve_hybrid("error E-4012")]

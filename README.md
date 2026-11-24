@@ -49,7 +49,7 @@ Edit `.env` and set `LLM_API_KEY`. Never commit `.env`. All settings can also be
 | `RRF_K` | `60` | Reciprocal rank fusion constant |
 | `INDEX_PATH` | `index` | Directory for the FAISS index and metadata |
 | `MAX_UPLOAD_MB` | `25` | Per-file upload limit |
-| `MAX_REQUEST_MB` | `100` | Total upload limit per request |
+| `MAX_REQUEST_MB` | `100` | Total upload limit per request (checked against `Content-Length` and while streaming; the body is already received by then, so this limits staging and ingestion rather than network transfer) |
 
 `.env.example` lists the main ones; the rest can be added the same way.
 
@@ -229,7 +229,7 @@ The script indexes `data/sample.pdf` in a temporary directory with the real embe
 - **hybrid+rerank**: vector top 20 + BM25 top 20, fused with RRF (k=60), reranked by the cross-encoder, top 5.
 - **bm25**: top 5 by BM25 alone (extra row for context).
 
-The question set has 5 exact-term/ID questions (error and part codes, RMA), 4 paraphrase questions with little keyword overlap, 3 mixed ones and 5 harder, more loosely worded ones (Q13 to Q17). The first 12 were written first; the last 5 were added, before looking at which mode wins, because the first 12 gave identical hit@5 for every mode.
+The question set has 5 exact-term/ID questions (error and part codes, RMA), 4 paraphrase questions with little keyword overlap, 3 mixed ones and 5 harder, more loosely worded ones (Q13 to Q17). The first 12 were written first; the first 12 questions tied at hit@5 = 1.00 for every mode, so the last 5 harder ones were added, written and page-checked before they were run.
 
 | Mode | hit@1 | hit@5 | MRR |
 |---|---|---|---|
@@ -261,7 +261,7 @@ app/
   llm.py          OpenAI-compatible LLM client (mockable)
   generate.py     prompt building + answer
   citations.py    citation parsing + validation
-tests/            test_chunking, test_ingest_store, test_retrieval, test_fusion,
+tests/            helpers (shared fakes), test_chunking, test_ingest_store, test_retrieval, test_fusion,
                   test_llm, test_generate, test_citations, test_api
 data/
   sample.pdf          22-page synthetic manual used for demos and evaluation

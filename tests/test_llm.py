@@ -138,3 +138,8 @@ def test_live_llm_roundtrip() -> None:
         pytest.skip("no real LLM_API_KEY configured")
     out = OpenAICompatibleLLM(settings).complete("Reply with one word.", "Say: pong")
     assert isinstance(out, str) and out.strip()
+
+
+def test_none_content_is_empty_string() -> None:
+    llm, _, _ = make([None])
+    assert llm.complete("S", "U") == ""

@@ -14,6 +14,7 @@ class LLMError(Exception):
     http_status: int = 500
 
     def __init__(self, message: str, http_status: int | None = None) -> None:
+        """Keep `message`; `http_status` overrides the class default when given."""
         super().__init__(message)
         self.message = message
         if http_status is not None:
@@ -60,6 +61,8 @@ def _error_code(exc: Exception) -> str:
 
 def _content_text(content: Any) -> str:
     """Flatten a chat reply: plain string, or a list of text blocks / strings."""
+    if content is None:
+        return ""
     if isinstance(content, str):
         return content
     if isinstance(content, list):

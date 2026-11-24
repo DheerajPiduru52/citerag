@@ -77,3 +77,11 @@ def test_snippet_length_and_whitespace() -> None:
     s = make_snippet(long)
     assert len(s) <= SNIPPET_CHARS and s.endswith("...") and "  " not in s
     assert make_snippet("short\n\ttext") == "short text"
+
+
+def test_huge_digit_marker_is_not_a_citation_and_does_not_crash() -> None:
+    assert parse_markers("see [" + "9" * 5000 + "] and [2]") == [2]
+    assert parse_markers("[1234567]") == []  # more than 6 digits: not a marker
+    assert parse_markers("[1, " + "9" * 5000 + "]") == []
+    assert parse_markers("[999999]") == [999999]
+    assert [c.invalid for c in build_citations("x [" + "9" * 5000 + "]", [])] == []

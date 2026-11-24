@@ -9,11 +9,11 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from langchain_core.embeddings import Embeddings
-from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from langchain_core.embeddings import Embeddings
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import Settings, get_settings
 from app.generate import answer_question
@@ -47,6 +47,7 @@ class LockedRetriever:
     """
 
     def __init__(self, inner: HybridRetriever, lock: Any) -> None:
+        """Wrap `inner`; `lock` is the store's (re-entrant) lock."""
         self.inner, self.lock = inner, lock
 
     def retrieve_hybrid(self, *args: Any, **kwargs: Any) -> list[Candidate]:
@@ -62,6 +63,7 @@ class ValidationErrorResponse(ErrorResponse):
 
 
 def _err(status: int, detail: str, code: str) -> JSONResponse:
+    """JSON error response in the standard ErrorResponse shape."""
     return JSONResponse(ErrorResponse(detail=detail, code=code).model_dump(), status_code=status)
 
 
@@ -73,6 +75,7 @@ def safe_basename(name: str | None) -> str:
 
 
 def _to_chunk(c: Candidate) -> RetrievedChunk:
+    """Convert a retrieval Candidate to its API model."""
     return RetrievedChunk(
         chunk_id=c.chunk_id, doc_id=c.doc_id, filename=c.filename, page=c.page, text=c.text,
         vector_score=c.vector_score, bm25_score=c.bm25_score, fused_score=c.fused_score,
@@ -156,6 +159,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Load models and the store once at startup and attach them to app.state."""
         emb = embeddings or make_embeddings(cfg)
         store = DocumentStore(emb, cfg.index_path, cfg)
         if reranker is None:
@@ -177,6 +181,7 @@ def create_app(
 
     @app.exception_handler(LLMError)
     async def llm_error_handler(request: Request, exc: LLMError) -> JSONResponse:
+        """Map LLM failures to their HTTP status and an `llm_*` error code."""
         if isinstance(exc, LLMQuotaExceeded):
             code = "llm_quota_exceeded"
         elif isinstance(exc, LLMUpstreamError):
@@ -188,6 +193,7 @@ def create_app(
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        """Render HTTP errors in the standard ErrorResponse shape."""
         return JSONResponse(
             ErrorResponse(detail=str(exc.detail), code=f"http_{exc.status_code}").model_dump(),
             status_code=exc.status_code,
@@ -198,6 +204,7 @@ def create_app(
     async def validation_error_handler(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
+        """Render request validation failures (422) with per-field errors."""
         body = ValidationErrorResponse(
             detail="Request validation failed", code="validation_error",
             errors=jsonable_encoder(exc.errors(), custom_encoder={Exception: str}),
@@ -206,6 +213,7 @@ def create_app(
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Log unexpected errors; return a generic 500 without internals."""
         logger.error("Unhandled error on %s %s", request.method, request.url.path,
                      exc_info=exc)
         return _err(500, "Internal server error", "internal_error")
@@ -226,6 +234,7 @@ def create_app(
                 "description": "A file exceeds MAX_UPLOAD_MB or the request exceeds MAX_REQUEST_MB",
             },
             415: {"model": ErrorResponse, "description": "Not a PDF"},
+            500: {"model": ErrorResponse, "description": "Embedding, index or save failure"},
             422: {
                 "model": ValidationErrorResponse,
                 "description": (
@@ -245,15 +254,16 @@ def create_app(
         a batch may mix newly added and skipped duplicates; see each result's `skipped`).
 
         Size limits: `max_upload_mb` per file and `max_request_mb` across all files.
-        Starlette spools the multipart body to disk before this handler runs, so the
-        Content-Length pre-check below is only the early guard (it rejects with 413
-        before any file is read or staged); the streaming caps cover missing/lying headers.
+        The framework has already received and spooled the multipart body before this
+        handler runs, so the Content-Length pre-check below is not an early network
+        guard: it only avoids staging and ingesting an oversized request (413). The
+        streaming caps cover missing or lying headers.
         """
         st = request.app.state
         limit = int(st.settings.max_upload_mb * 1024 * 1024)
         total = int(st.settings.max_request_mb * 1024 * 1024)
         declared = request.headers.get("content-length", "")
-        if declared.isdigit() and int(declared) > total:
+        if declared.isascii() and declared.isdigit() and int(declared) > total:
             raise HTTPException(
                 413, f"Request exceeds the maximum total upload size of {total / 1048576:g} MB."
             )
@@ -319,7 +329,6 @@ def create_app(
             429: {"model": ErrorResponse, "description": "LLM quota exceeded"},
             500: {"model": ErrorResponse, "description": "LLM misconfigured / internal error"},
             502: {"model": ErrorResponse, "description": "LLM provider upstream failure"},
-            503: {"model": ErrorResponse, "description": "LLM unavailable"},
         },
     )
     def query(body: QueryRequest, request: Request) -> QueryResponse:

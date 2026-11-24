@@ -120,3 +120,13 @@ def test_answer_question_empty_index_skips_llm(tmp_path: Path) -> None:
     llm = FakeLLM()
     res = answer_question("q", HybridRetriever(store), Reranker(FakeCrossEncoder()), llm)
     assert res.answer == IDK_ANSWER and res.citations == [] and llm.calls == []
+
+
+@pytest.mark.parametrize("reply", ["", "   \n\t "])
+def test_empty_llm_reply_raises_502(reply: str) -> None:
+    from app.llm import LLMError
+
+    with pytest.raises(LLMError) as ei:
+        generate_answer("Why?", [cand(1)], FakeLLM(reply))
+    assert ei.value.http_status == 502
+    assert ei.value.message == "LLM returned an empty reply"

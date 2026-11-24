@@ -1,6 +1,7 @@
 """FAISS vector store plus a JSON metadata store, persisted to disk."""
 import copy
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -17,6 +18,8 @@ from langchain_core.embeddings import Embeddings
 
 from app.config import Settings, get_settings
 from app.ingest import load_pdf, sha256_file
+
+logger = logging.getLogger("citerag")
 
 INDEX_NAME = "index"
 META_FILE = "metadata.json"
@@ -52,6 +55,7 @@ class DocumentStore:
         index_dir: str | Path | None = None,
         settings: Settings | None = None,
     ) -> None:
+        """Open (or create) the store in `index_dir`, loading any saved index."""
         self.settings = settings or get_settings()
         self.embeddings = embeddings
         self.dir = Path(index_dir or self.settings.index_path)
@@ -77,6 +81,44 @@ class DocumentStore:
                 distance_strategy=DistanceStrategy.MAX_INNER_PRODUCT,
                 normalize_L2=False,
             )
+        self._reconcile()
+
+    def _reconcile(self) -> None:
+        """Make vectors and metadata agree after a partial save (in memory only).
+
+        save() writes the FAISS files before metadata.json, so a crash can leave them
+        out of step. Vectors whose id is not in metadata (orphans) are deleted from
+        the index so a re-upload works; documents with chunks missing from the index
+        are dropped with all their chunks and vectors. The next save() persists this.
+        """
+        vector_ids: set[str] = set()
+        if self.vs is not None:
+            vector_ids = set(self.vs.index_to_docstore_id.values())
+            in_docstore = set(self.vs.docstore._dict)  # type: ignore[attr-defined]
+            if vector_ids != in_docstore:
+                logger.warning(
+                    "FAISS docstore and index ids disagree (%d vs %d); using the docstore ids.",
+                    len(vector_ids), len(in_docstore),
+                )
+                vector_ids &= in_docstore
+        bad_docs = {c["doc_id"] for cid, c in self.chunks.items() if cid not in vector_ids}
+        bad_docs |= {
+            d for d, info in self.documents.items()
+            if info.get("chunks", 0) > 0
+            and not any(c["doc_id"] == d for c in self.chunks.values())
+        }
+        if bad_docs:
+            logger.warning(
+                "Index and metadata disagree; dropping %d document(s) with missing vectors: %s",
+                len(bad_docs), sorted(bad_docs),
+            )
+            self.chunks = {c: v for c, v in self.chunks.items() if v["doc_id"] not in bad_docs}
+            for d in bad_docs:
+                self.documents.pop(d, None)
+        orphans = [i for i in vector_ids if i not in self.chunks]
+        if orphans and self.vs is not None:
+            logger.warning("Dropping %d orphan vector(s) with no metadata.", len(orphans))
+            self.vs.delete(orphans)
 
     def save(self) -> None:
         """Persist the FAISS index and metadata to disk, as atomically as possible.

@@ -173,3 +173,50 @@ def test_real_bge_embeddings(tmp_path: Path) -> None:
     q = "why does the pump keep switching off by itself when the tank is nearly empty"
     best = s.similarity_search(q, 3)
     assert any(d.metadata["page"] == 8 for d, _ in best)
+
+
+def _two_pdfs(tmp_path: Path) -> tuple[Path, Path]:
+    a = make_pdf(tmp_path / "a.pdf", ["Alpha pump error E-4012 suction pressure. " * 8])
+    b = make_pdf(tmp_path / "b.pdf", ["Zephyr gearbox grease GR-77 every season. " * 8])
+    return a, b
+
+
+def test_load_drops_orphan_vectors_after_partial_save(tmp_path: Path) -> None:
+    """Index files newer than metadata.json: orphan vectors are dropped, re-upload works."""
+    a, b = _two_pdfs(tmp_path)
+    idx = tmp_path / "idx"
+    store = DocumentStore(FakeEmbeddings(), idx)
+    ra = store.add_document(a)
+    old_meta = (idx / "metadata.json").read_bytes()
+    rb = store.add_document(b)
+    (idx / "metadata.json").write_bytes(old_meta)  # crash before metadata was replaced
+
+    again = DocumentStore(FakeEmbeddings(), idx)
+    assert [d["doc_id"] for d in again.list_documents()] == [ra.doc_id]
+    assert again.vs is not None and again.vs.index.ntotal == ra.chunks
+    assert set(again.vs.index_to_docstore_id.values()) == set(again.chunks)
+    assert {d.metadata["doc_id"] for d, _ in again.similarity_search("gearbox grease", 10)} == {
+        ra.doc_id
+    }
+    res = again.add_document(b)  # re-upload is not a duplicate and is searchable
+    assert not res.skipped and res.doc_id == rb.doc_id
+    assert again.vs.index.ntotal == ra.chunks + rb.chunks
+
+
+def test_load_drops_documents_missing_vectors(tmp_path: Path) -> None:
+    """metadata.json newer than the index files: chunks without vectors are dropped."""
+    a, b = _two_pdfs(tmp_path)
+    idx = tmp_path / "idx"
+    store = DocumentStore(FakeEmbeddings(), idx)
+    ra = store.add_document(a)
+    old_faiss = (idx / "index.faiss").read_bytes()
+    old_pkl = (idx / "index.pkl").read_bytes()
+    rb = store.add_document(b)
+    (idx / "index.faiss").write_bytes(old_faiss)
+    (idx / "index.pkl").write_bytes(old_pkl)
+
+    again = DocumentStore(FakeEmbeddings(), idx)
+    assert [d["doc_id"] for d in again.list_documents()] == [ra.doc_id]
+    assert len(again.all_chunks()) == ra.chunks
+    assert not again.add_document(b).skipped
+    assert again.find_by_hash(again.documents[rb.doc_id]["sha256"]) is not None

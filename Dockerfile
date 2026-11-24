@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -10,7 +10,7 @@ WORKDIR /app
 # CPU-only torch first (much smaller than the default CUDA build); the
 # remaining requirements then see torch as already satisfied.
 COPY requirements.txt .
-RUN pip install torch --index-url https://download.pytorch.org/whl/cpu \
+RUN pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu \
     && pip install -r requirements.txt
 
 # Bake the embedding and rerank models into the image so start-up needs no download.

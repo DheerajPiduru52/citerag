@@ -71,6 +71,7 @@ class BM25Index:
     """BM25 over a store's chunks; rebuilds itself when the chunk set changes."""
 
     def __init__(self, store: DocumentStore) -> None:
+        """Start empty; the index is built lazily on first search."""
         self.store = store
         self._ids: list[str] = []
         self._bm25: BM25Okapi | None = None
@@ -116,11 +117,13 @@ class HybridRetriever:
     """Vector, BM25 and fused (RRF) retrieval over a DocumentStore."""
 
     def __init__(self, store: DocumentStore, settings: Settings | None = None) -> None:
+        """Bind to `store`; settings supply the default vector/BM25/RRF parameters."""
         self.store = store
         self.settings = settings or get_settings()
         self.bm25 = BM25Index(store)
 
     def _candidate(self, chunk_id: str, **fields: Any) -> Candidate:
+        """Build a Candidate from the store's metadata for `chunk_id` (must exist)."""
         c = self.store.chunks[chunk_id]
         return Candidate(
             chunk_id=chunk_id,
@@ -136,7 +139,12 @@ class HybridRetriever:
         if k is None:
             k = self.settings.vector_k
         hits = self.store.similarity_search(query, k)
-        return [(d.metadata["chunk_id"], float(s)) for d, s in hits]
+        chunks = self.store.chunks
+        return [
+            (d.metadata["chunk_id"], float(s))
+            for d, s in hits
+            if d.metadata.get("chunk_id") in chunks  # skip vectors with no metadata
+        ]
 
     def bm25_search(self, query: str, k: int | None = None) -> list[tuple[str, float]]:
         """Top-k (chunk_id, BM25 score)."""

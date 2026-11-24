@@ -10,8 +10,9 @@ SNIPPET_CHARS = 200
 
 _FENCED = re.compile(r"```.*?```", re.DOTALL)
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
-# [2] or [1, 3]; not followed by "(" (markdown link).
-_MARKER = re.compile(r"\[\s*([0-9]+(?:\s*,\s*[0-9]+)*)\s*\](?!\()")
+# [2] or [1, 3]; not followed by "(" (markdown link). Numbers are capped at 6 digits:
+# a longer digit run is simply not a citation marker (and cannot hit int()'s digit limit).
+_MARKER = re.compile(r"\[\s*([0-9]{1,6}(?:\s*,\s*[0-9]{1,6})*)\s*\](?!\()")
 
 
 @dataclass

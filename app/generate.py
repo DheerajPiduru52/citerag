@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass, field
 
 from app.citations import IDK_ANSWER, Citation, build_citations, is_idk
-from app.llm import LLMClient
+from app.llm import LLMClient, LLMError
 from app.rerank import Reranker
 from app.retrieval import Candidate, HybridRetriever
 
@@ -72,6 +72,8 @@ def generate_answer(
         return GeneratedAnswer(IDK_ANSWER, {})
     sources = {i: c for i, c in enumerate(candidates, 1)}
     reply = llm.complete(SYSTEM_PROMPT, build_user_prompt(question, candidates))
+    if not reply or not reply.strip():
+        raise LLMError("LLM returned an empty reply", 502)
     answer = IDK_ANSWER if is_idk(reply) else reply.strip()
     return GeneratedAnswer(answer, sources)
 
