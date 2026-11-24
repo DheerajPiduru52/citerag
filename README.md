@@ -70,7 +70,7 @@ docker run --rm -p 8000:8000 --env-file .env -e INDEX_PATH=/data/index -v citera
 
 The image uses CPU-only PyTorch, bakes the two models into the image, runs as a non-root user and stores the index in `/data/index` (the `citerag-index` volume above), so it survives container restarts. The `-e INDEX_PATH=/data/index` flag is needed because `.env` (copied from `.env.example`) sets `INDEX_PATH=index`, which would otherwise override the image default and point at a directory the non-root user cannot write. Use a named volume as shown; a bind-mounted host directory must be writable by UID 1000.
 
-> Note: the Dockerfile was written but could not be built in the environment where this README was produced (the Docker daemon was not running), so the Docker instructions are untested.
+The image is about 3.2 GB. On Windows, run the `docker run` command from PowerShell: Git Bash rewrites `/data/index` and `/data` into Windows paths, which breaks the index location.
 
 ### Note on the default LLM endpoint
 
