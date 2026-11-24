@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     rrf_k: int = 60
 
     index_path: str = "index"
+    max_upload_mb: float = 25.0
+    max_request_mb: float = 100.0
 
 
 @lru_cache

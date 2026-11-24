@@ -5,6 +5,7 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
+from pypdf.errors import DependencyError, PyPdfError
 
 from app.config import Settings, get_settings
 
@@ -23,10 +24,31 @@ def doc_id_from_hash(sha256: str) -> str:
     return sha256[:16]
 
 
+class PDFParseError(Exception):
+    """The file could not be parsed as a PDF (corrupt, unsupported or unreadable)."""
+
+
+class EncryptedPDFError(PDFParseError):
+    """The PDF is encrypted (or needs a crypto dependency); not supported."""
+
+
 def extract_pages(path: Path) -> list[tuple[int, str]]:
-    """Extract (1-based page number, text) pairs, skipping empty pages."""
-    reader = PdfReader(str(path))
-    pages = [(i, page.extract_text() or "") for i, page in enumerate(reader.pages, 1)]
+    """Extract (1-based page number, text) pairs, skipping empty pages.
+
+    Raises PDFParseError (or EncryptedPDFError) for any parse-time failure.
+    """
+    try:
+        reader = PdfReader(str(path))
+        if reader.is_encrypted:
+            raise EncryptedPDFError("encrypted PDF")
+        pages = [(i, page.extract_text() or "") for i, page in enumerate(reader.pages, 1)]
+    except PDFParseError:
+        raise
+    except DependencyError as exc:
+        raise EncryptedPDFError(str(exc)) from exc
+    except (PyPdfError, ValueError, EOFError, KeyError, AttributeError, TypeError,
+            IndexError, RecursionError) as exc:
+        raise PDFParseError(str(exc)) from exc
     return [(n, t) for n, t in pages if t.strip()]
 
 
