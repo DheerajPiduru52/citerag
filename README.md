@@ -6,6 +6,14 @@ CiteRAG is a retrieval-augmented generation (RAG) service for PDF question answe
 
 ## Architecture
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
+  <img alt="CiteRAG architecture: a PDF is chunked, embedded locally into a FAISS index and stored in a BM25 corpus; a question searches both, the top 20 from each are fused with RRF, reranked by a cross-encoder to the top 5, and an OpenAI-compatible LLM returns an answer whose citation markers are validated against the sources." src="docs/architecture-light.svg">
+</picture>
+
+<details>
+<summary>Diagram as text (Mermaid)</summary>
+
 ```mermaid
 flowchart LR
     A["Upload PDF"] --> B["Chunk (800 chars, 120 overlap)"]
@@ -20,6 +28,8 @@ flowchart LR
     G --> H["LLM (OpenAI-compatible)"]
     H --> I["Cited answer + validated citations"]
 ```
+
+</details>
 
 ## Setup
 
